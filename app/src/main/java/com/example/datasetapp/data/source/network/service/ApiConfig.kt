@@ -11,20 +11,24 @@ import java.util.concurrent.TimeUnit
 
 class ApiConfig {
     companion object {
-        fun invoke(): DatasetApiService {
-            val okHttpClient =
-                OkHttpClient.Builder()
-                    .addInterceptor(BasicAuthInterceptor("DATASET_APP", "yu6W742s9BcEAvFm3VQCNgZUzjfeqhRDpSrGPYdM8"))
-                    .connectTimeout(120, TimeUnit.SECONDS)
-                    .readTimeout(120, TimeUnit.SECONDS)
-                    .build()
-            val retrofit =
-                Retrofit.Builder()
-                    .baseUrl(BuildConfig.BASE_URL)
-                    .addConverterFactory(GsonConverterFactory.create())
-                    .client(okHttpClient)
-                    .build()
-            return retrofit.create(DatasetApiService::class.java)
+        private val okHttpClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .addInterceptor(BasicAuthInterceptor("DATASET_APP", "yu6W742s9BcEAvFm3VQCNgZUzjfeqhRDpSrGPYdM8"))
+                .connectTimeout(120, TimeUnit.SECONDS)
+                .readTimeout(120, TimeUnit.SECONDS)
+                .build()
+        }
+
+        private val retrofit: Retrofit by lazy {
+            Retrofit.Builder()
+                .baseUrl(BuildConfig.BASE_URL)
+                .addConverterFactory(GsonConverterFactory.create())
+                .client(okHttpClient)
+                .build()
+        }
+
+        val apiService: DatasetApiService by lazy {
+            retrofit.create(DatasetApiService::class.java)
         }
     }
 

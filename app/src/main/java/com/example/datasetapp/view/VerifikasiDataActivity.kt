@@ -4,6 +4,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toFile
 import com.example.datasetapp.R
@@ -28,7 +29,6 @@ class VerifikasiDataActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         val imageUri: Uri? = intent.getParcelableExtra("image_uri")
-        val photoPath = intent.getStringExtra("photo_path") ?: ""
 
         // Menampilkan gambar jika ada
         if (imageUri != null) {
@@ -36,67 +36,49 @@ class VerifikasiDataActivity : AppCompatActivity() {
             binding.ivKtp.setImageURI(imageUriParsed)
         }
 
-        // Menyimpan input NIK dan Nama ke dalam ViewModel
-        val nik = binding.etInputNik.text.toString()
-        val nama = binding.etInputName.text.toString()
-
-        viewModel.nik = nik
-        viewModel.name = nama
-
-        binding.btnLanjut.setOnClickListener(uploadkatp(imageUri!!, nik, nama))
+        binding.btnLanjut.setOnClickListener {
+            imageUri?.let { uri ->
+                val nik = binding.etInputNik.text.toString()
+                val nama = binding.etInputName.text.toString()
+                uploadKtpKyc(uri, nama, nik)
+            }
+        }
 
     }
 
-    private fun uploadkatp(imageUri: Uri, nik: String, nama : String): View.OnClickListener {
-        return View.OnClickListener {
-            val file = imageUri.toFile()
-            val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
-            val body = requestFile.let {
-                MultipartBody.Part.createFormData(
-                    "image",
-                    "KTP_${nik}_${nama}",
-                    it
-                )
-            }
+    private fun uploadKtpKyc(imageUri: Uri, nik: String, nama: String) {
+        // Mengubah Uri menjadi File
+        val originalFile = imageUri.toFile()
 
-            // Log untuk cek apakah uploadKtpKyc dipanggil
-            Log.d("UploadStatus", "uploadkatp: Mulai upload")
+        // Membuat nama file baru
+        val newFileName = "KTP_${nama}_$nik.${originalFile.extension}" // Menambahkan ekstensi asli
+        val newFile = File(originalFile.parent, newFileName) // Lokasi dan nama file baru
 
-            viewModel.uploadKtpKyc(body).observe(this) { resource ->
-                when (resource.status) {
-                    StatusEnum.SUCCESS -> {
-                        // Log response jika sukses
-                        Log.d("UploadSuccess", "Response: ${resource.data}")
-                    }
+        // Mengganti nama file
+        if (originalFile.renameTo(newFile)) {
+            Log.d("FileRename", "File renamed to: ${newFile.name}")
 
-                    StatusEnum.FAILED -> {
-                        // Log error jika gagal
-                        Log.e("UploadError", "Error: ${resource.message}")
-                    }
-
-                    StatusEnum.LOADING -> {
-                        // Log atau tampilkan loading jika diperlukan
-                        Log.d("UploadLoading", "Uploading...")
-                    }
+            // Memanggil ViewModel untuk meng-upload gambar
+            viewModel.uploadKtpKyc(newFile,
+                onSuccess = { response ->
+                    Log.d("UploadSuccess", "Response: $response")
+                    val fragment = CameraSelfieFragment()
+                    supportFragmentManager.beginTransaction()
+                        .replace(R.id.blank_page, fragment)
+                        .addToBackStack(null)
+                        .commit()
+                },
+                onError = { error ->
+                    Log.e("UploadError", "Error: $error")
+                    Toast.makeText(this, "Upload gagal: $error", Toast.LENGTH_LONG).show()
                 }
-            }
-
-            // Ganti fragment setelah upload
-            val fragment = CameraSelfieFragment()
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.blank_page, fragment)
-                .addToBackStack(null)
-                .commit()
-        }
-    }
-
-    private fun renameFile(oldPath: String, newFile: File): String {
-        val oldFile = File(oldPath)
-
-        return if (oldFile.exists() && oldFile.renameTo(newFile)) {
-            newFile.absolutePath
+            )
         } else {
-            oldPath
+            Log.e("FileRename", "Failed to rename file.")
+            // Tangani kegagalan mengganti nama file (misalnya, tampilkan pesan kesalahan)
         }
     }
+
+
 }
+
